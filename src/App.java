@@ -53,8 +53,12 @@ public class App {
                 if (isPrime) {
                     System.out.println(inputNumber + " is prime.");
                 } else {
-                    String factorString = "Two factors are " + (inputNumber / factor) + " and " + factor;
-                    System.out.println(inputNumber + " is NOT prime. " + factorString);
+                    if (factor != 0)
+                    {
+                        String factorString = "Two factors are " + (inputNumber / factor) + " and " + factor;
+                        System.out.println(inputNumber + " is NOT prime. " + factorString);
+                    }
+                    else System.out.println(inputNumber + " is NOT prime. A program error occurred and it cannot find any factors.");
                 }
                 long curTime = (System.currentTimeMillis()/1000);
                 System.out.println("Seconds elasped: " + (curTime - startingTime));
@@ -118,6 +122,7 @@ public class App {
         long workingNumber = workingNumberGroups[myThreadNum];
         boolean prime = true;
         if (inputNumber % 2 == 0) {
+            factor = 2;
             return false;
         }
         for (long i = workingNumber - workingNumberDelta; i <= workingNumber; i++) {
