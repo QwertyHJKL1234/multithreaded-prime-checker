@@ -48,7 +48,7 @@ public class App {
             return;
         }
         while (true) {
-            if (numberOfThreadsCompleted >= (numOfThreads - 1)) {
+            if (numberOfThreadsCompleted >= (numOfThreads - 1) && numberOfThreadsCompleted != Integer.MAX_VALUE) {
                 System.out.println("100% Completed.");
                 if (isPrime) {
                     System.out.println(inputNumber + " is prime.");
@@ -65,6 +65,10 @@ public class App {
                 for (int i = 0; i < numOfThreads; i++) {
                     threads[i].interrupt();
                 }
+                main(args);
+            }
+            else if (numberOfThreadsCompleted == Integer.MAX_VALUE)
+            {
                 main(args);
             }
             else {
@@ -85,6 +89,7 @@ public class App {
                 return false;
             }
             System.out.println("Error: Input is not a number, or is too long for this program. Please try again.");
+            numberOfThreadsCompleted = Integer.MAX_VALUE;
             return true;
         }
         if (input.length() >= 10)
