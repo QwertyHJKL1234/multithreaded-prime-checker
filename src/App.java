@@ -30,29 +30,37 @@ public class App {
             }
         } catch (NumberFormatException e) {
 
+            //If first arg is not a number, exit running
             System.out.println("Error: Desired number of threads is not a number.");
             return;
         } catch (OutOfMemoryError e) {
+            //If more threads than available, set to maximum
             System.out.println(
                     "Error: Requested number of threads is more threads than the CPU can handle. Setting to maximum amount of CPU threads available. CPU Threads: "
                             + Runtime.getRuntime().availableProcessors());
             numOfThreads = Runtime.getRuntime().availableProcessors();
         } catch (ArrayIndexOutOfBoundsException e) {
+            //If no arg is present, set to max amount available
             System.out.println(
                     "Warning: There is no requested number of threads. Setting to maximum amount of CPU threads available. CPU Threads: "
                             + Runtime.getRuntime().availableProcessors() + ". Request number of threads by passing an argument to the program.");
             numOfThreads = Runtime.getRuntime().availableProcessors();
         }
+        //Array of threads
         threads = new Thread[numOfThreads];
+        //Starting code - if run() is false, then user asked to exit
         if (!run()) {
             return;
         }
+        //While loop for the entirety of the program. Technically is a recursive function so can only run a finite amount of time before a StackOverflow.
         while (true) {
+            //If all threads done calculating...
             if (numberOfThreadsCompleted >= (numOfThreads - 1) && numberOfThreadsCompleted != Integer.MAX_VALUE) {
                 System.out.println("100% Completed.");
                 if (isPrime) {
                     System.out.println(inputNumber + " is prime.");
                 } else {
+                    //If there is a saved factor, display them. Else show that there was an error.
                     if (factor != 0)
                     {
                         String factorString = "Two factors are " + (inputNumber / factor) + " and " + factor;
@@ -60,98 +68,128 @@ public class App {
                     }
                     else System.out.println(inputNumber + " is NOT prime. A program error occurred and it cannot find any factors.");
                 }
+                //Get current system time
                 long curTime = (System.currentTimeMillis()/1000);
+                //Display how long the calculation took
                 System.out.println("Seconds elasped: " + (curTime - startingTime));
+                //End all threads
                 for (int i = 0; i < numOfThreads; i++) {
                     threads[i].interrupt();
                 }
+                //Restart the program, recursive, StackOverflow is not handled.
                 main(args);
             }
+            //Else if user failed to input a integer
             else if (numberOfThreadsCompleted == Integer.MAX_VALUE)
             {
+                //Restart the program, recursive, StackOverflow is not handled.
                 main(args);
             }
+            //If not all threads completed, continue
             else {
                 continue;
             }
         }
     }
     public static boolean run() {
+        //start a console to read input
         Console console = System.console();
         System.out.println("Input a number to check if prime:");
         String input = console.readLine();
+        //Get starting time to find out how long calc takes
         startingTime = System.currentTimeMillis()/1000;
         System.out.println("Starting time (unix): " + startingTime);
+        //Try to parse input as long
         try {
             inputNumber = Long.parseLong(input);
         } catch (NumberFormatException e) {
             if (input.equals("exit")) {
+                //If exit, end program
                 return false;
             }
             System.out.println("Error: Input is not a number, or is too long for this program. Please try again.");
+            //Tell main() to restart program
             numberOfThreadsCompleted = Integer.MAX_VALUE;
             return true;
         }
+        //if number is big, warn the user of how long it will take.
         if (input.length() >= 10)
         System.out.println("Warning: Number is very long and will take some time to compute.");
+        //Prepare all threads
         numberOfThreadsCompleted = 0;
         threadNum = 0;
+        //Assume is prime unless found otherwise
         isPrime = true;
+        //Split number for each thread to calc
         splitNumber();
+        //Start all threads to startup with the function startThread()
         for (int i = 0; i < numOfThreads; i++) {
             threads[i] = new Thread(() -> {
                 startThread();
             });
             threads[i].start();
         }
+        //Tell program to continue running
         return true;
     }
 
     static void startThread() {
+        //Get index of thread, before another thread steals it
         int myThreadNum = threadNum;
         threadNum += 1;
+        //Calc each thread's specific set of numbers
         boolean checker = calc1(myThreadNum);
+        //If we found out the number is not prime, and another thread doesn't already know that
         if (!checker && isPrime) 
         {
+            //Set not prime
             isPrime = checker;
         }
-        if ((float) (numberOfThreadsCompleted + 1) / (float) numOfThreads != 1f) {
+        //If 100% of threads are done, don't report it (main() reports 100% complete.)
+        if ((float) ((numberOfThreadsCompleted + 1) / (float) numOfThreads) != 1f) {
+            //Else report the percentage of completion, as a whole number
             int percentageCompleted = (int)(((float) numberOfThreadsCompleted / (float) numOfThreads) * 100);
             System.out.println(percentageCompleted + "% Completed.");
         }
+        //Announce the thread is done
         numberOfThreadsCompleted += 1;
         return;
     }
 
     static boolean calc1(int myThreadNum) {
-        long workingNumber = workingNumberGroups[myThreadNum];
+        //Get the maximum number this thread works to.
+        long maximumWorkingNumber = workingNumberGroups[myThreadNum];
+        //Assume prime, unless disproven
         boolean prime = true;
+        //If even number, don't do any calculations
         if (inputNumber % 2 == 0) {
             factor = 2;
             return false;
         }
-        for (long i = workingNumber - workingNumberDelta; i <= workingNumber; i++) {
-            // if (workingNumber == workingNumberDelta)
-            // {
-            //     continue;
-            // }
+        //Work through each number we are assigned, starting at our minimum number (maximumWorkingNumber - workingNumberDelta), and work upto our maximum.
+        for (long i = maximumWorkingNumber - workingNumberDelta; i <= maximumWorkingNumber; i++) {
             double testNum = inputNumber;
+            //If we are testing 1, skip it, every number is divisable by 1
             if (i == 1)
             {
                 continue;
             }
+            //If the input number / our current test is perfectly divisable, remember the factor, and report number is not prime. End all calculations, no point to continuing.
             if (testNum % i == 0) {
                 factor = i;
-                prime = false;
+                return false;
             }
         }
+        //Else return true
         return prime;
     }
 
     static void splitNumber() {
         workingNumberGroups = new long[numOfThreads];
+        //Get the amount of numbers each thread will work on 
         workingNumberDelta = (inputNumber / 2) / numOfThreads;
         long lastNumUsed = 0;
+        //Create sets of numbers for each thread to work to. (just by setting the maximum number the thread will work to)
         for (int i = 0; i < numOfThreads; i++) {
             workingNumberGroups[i] = lastNumUsed + workingNumberDelta;
             lastNumUsed = workingNumberGroups[i];
