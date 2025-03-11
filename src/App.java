@@ -1,4 +1,12 @@
 import java.io.Console;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.util.ArrayList;
+@SuppressWarnings("unchecked")
 
 public class App {
     static int numOfThreads;
@@ -13,6 +21,7 @@ public class App {
     static boolean runTests;
     static int testNumber;
     static long startingTime;
+    static ArrayList<Result> rememberedResults = new ArrayList<Result>();
 
     public static void main(String[] args) throws Exception {
         numOfThreads = 1;
@@ -48,11 +57,12 @@ public class App {
         }
         //Array of threads
         threads = new Thread[numOfThreads];
+        rememberedResults = loadMemory();
         //Starting code - if run() is false, then user asked to exit
         if (!run()) {
             return;
         }
-        //While loop for the entirety of the program. Technically is a recursive function so can only run a finite amount of time before a StackOverflow.
+        //While loop for the entirety of the program. Technically is a recursive function so can only run a finite amount of times before a StackOverflow.
         while (true) {
             //If all threads done calculating...
             if (numberOfThreadsCompleted >= (numOfThreads - 1) && numberOfThreadsCompleted != Integer.MAX_VALUE) {
@@ -68,6 +78,7 @@ public class App {
                     }
                     else System.out.println(inputNumber + " is NOT prime. A program error occurred and it cannot find any factors.");
                 }
+                memoize(inputNumber,factor,isPrime);
                 //Get current system time
                 long curTime = (System.currentTimeMillis()/1000);
                 //Display how long the calculation took
@@ -91,6 +102,55 @@ public class App {
             }
         }
     }
+    public static ArrayList<Result> loadMemory()
+    {
+        ArrayList<Result> results = new ArrayList<Result>();
+        try 
+        (
+            FileInputStream fis = new FileInputStream(System.getenv("APPDATA") + "\\PrimeCalculator\\memoize.primes");
+            ObjectInputStream ois = new ObjectInputStream(fis)
+        ) 
+        {
+            results = (ArrayList<Result>) ois.readObject();
+        } 
+        catch (IOException | ClassNotFoundException e) 
+        {
+            e.printStackTrace();
+        }
+        return results;
+    }
+    public static void memoize(long input, long factor1, boolean prime)
+    {
+        try 
+        {
+            rememberedResults.add(new Result(input,factor1,prime));
+            File myObj = new File(System.getenv("APPDATA") + "\\PrimeCalculator\\memoize.primes");
+            new File(System.getenv("APPDATA") + "\\PrimeCalculator").mkdirs();
+            myObj.delete();
+            myObj.createNewFile();
+            myObj.setWritable(true);
+            FileOutputStream fos = new FileOutputStream(myObj);
+            ObjectOutputStream oos = new ObjectOutputStream(fos);
+            oos.writeObject(rememberedResults);
+            oos.close();
+        }
+        catch (IOException e) 
+        {
+            System.out.println("An error occurred while trying to create a file.");
+            e.printStackTrace();
+        }
+    }
+    public static Result isRemembered(long number)
+    {
+        for (Result result : rememberedResults)
+        {
+            if (result.number == number)
+            {
+                return result;
+            }
+        }
+        return null;
+    }
     public static boolean run() {
         //start a console to read input
         Console console = System.console();
@@ -98,7 +158,6 @@ public class App {
         String input = console.readLine();
         //Get starting time to find out how long calc takes
         startingTime = System.currentTimeMillis()/1000;
-        System.out.println("Starting time (unix): " + startingTime);
         //Try to parse input as long
         try {
             inputNumber = Long.parseLong(input);
@@ -109,6 +168,23 @@ public class App {
             }
             System.out.println("Error: Input is not a number, or is too long for this program. Please try again.");
             //Tell main() to restart program
+            numberOfThreadsCompleted = Integer.MAX_VALUE;
+            return true;
+        }
+        Result rememberedResult = isRemembered(inputNumber);
+        if (rememberedResult != null)
+        {
+            if (rememberedResult.isPrime) {
+                System.out.println(inputNumber + " is prime.");
+            } else {
+                //If there is a saved factor, display them. Else show that there was an error.
+                if (rememberedResult.factor1 != 0)
+                {
+                    String factorString = "Two factors are " + rememberedResult.factor2 + " and " + rememberedResult.factor1;
+                    System.out.println(inputNumber + " is NOT prime. " + factorString);
+                }
+                else System.out.println(inputNumber + " is NOT prime. A program error occurred and it cannot find any factors.");
+            }
             numberOfThreadsCompleted = Integer.MAX_VALUE;
             return true;
         }
@@ -139,13 +215,13 @@ public class App {
         threadNum += 1;
         //Calc each thread's specific set of numbers
         boolean checker = calc1(myThreadNum);
-        //If we found out the number is not prime, and another thread doesn't already know that
+        //If we found out the number is not prime, and we don't already know that
         if (!checker && isPrime) 
         {
             //Set not prime
             isPrime = checker;
         }
-        //If 100% of threads are done, don't report it (main() reports 100% complete.)
+        //If 100% of threads are done, don't report the percentage of completion (main() reports 100% complete.)
         if ((float) ((numberOfThreadsCompleted + 1) / (float) numOfThreads) != 1f) {
             //Else report the percentage of completion, as a whole number
             int percentageCompleted = (int)(((float) numberOfThreadsCompleted / (float) numOfThreads) * 100);
@@ -166,7 +242,7 @@ public class App {
             factor = 2;
             return false;
         }
-        //Work through each number we are assigned, starting at our minimum number (maximumWorkingNumber - workingNumberDelta), and work upto our maximum.
+        //Work through each number we are assigned, starting at our minimum number (maximumWorkingNumber - workingNumberDelta), and work up to our maximum.
         for (long i = maximumWorkingNumber - workingNumberDelta; i <= maximumWorkingNumber; i++) {
             double testNum = inputNumber;
             //If we are testing 1, skip it, every number is divisable by 1
