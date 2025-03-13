@@ -1,11 +1,6 @@
-import java.io.Console;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
+import java.io.*;
 import java.util.ArrayList;
+//Doesn't check if the file of saved results is actually an ArrayList, could be a security issue.
 @SuppressWarnings("unchecked")
 
 public class App {
@@ -57,27 +52,31 @@ public class App {
         }
         //Array of threads
         threads = new Thread[numOfThreads];
+        //Load all saved numbers we have already calculated
         rememberedResults = loadMemory();
         //Starting code - if run() is false, then user asked to exit
         if (!run()) {
             return;
         }
-        //While loop for the entirety of the program. Technically is a recursive function so can only run a finite amount of times before a StackOverflow.
+        //While loop for the entirety of the program.
         while (true) {
             //If all threads done calculating...
             if (numberOfThreadsCompleted >= (numOfThreads - 1) && numberOfThreadsCompleted != Integer.MAX_VALUE) {
+                //Tell user that we are done
                 System.out.println("100% Completed.");
                 if (isPrime) {
                     System.out.println(inputNumber + " is prime.");
                 } else {
-                    //If there is a saved factor, display them. Else show that there was an error.
+                    //If there is a saved factor, display the factors.
                     if (factor != 0)
                     {
                         String factorString = "Two factors are " + (inputNumber / factor) + " and " + factor;
                         System.out.println(inputNumber + " is NOT prime. " + factorString);
                     }
+                    //Else show there was an error in the remembered factors
                     else System.out.println(inputNumber + " is NOT prime. A program error occurred and it cannot find any factors.");
                 }
+                //Remember our saved results to use later
                 memoize(inputNumber,factor,isPrime);
                 //Get current system time
                 long curTime = (System.currentTimeMillis()/1000);
@@ -87,7 +86,7 @@ public class App {
                 for (int i = 0; i < numOfThreads; i++) {
                     threads[i].interrupt();
                 }
-                //Restart the program, recursive, StackOverflow is not handled.
+                //Restart the program. Technically a recursive function, so can only run a finite amount of times before a StackOverflow.
                 main(args);
             }
             //Else if user failed to input a integer
@@ -96,39 +95,65 @@ public class App {
                 //Restart the program, recursive, StackOverflow is not handled.
                 main(args);
             }
-            //If not all threads completed, continue
+            //If not all threads completed, continue running until they are all finished.
             else {
                 continue;
             }
         }
     }
+    //Load our saved numbers that we have already calculated.
     public static ArrayList<Result> loadMemory()
     {
         ArrayList<Result> results = new ArrayList<Result>();
-        try 
-        (
-            FileInputStream fis = new FileInputStream(System.getenv("APPDATA") + "\\PrimeCalculator\\memoize.primes");
-            ObjectInputStream ois = new ObjectInputStream(fis)
-        ) 
+        try
         {
+            //Try to load the file to the arraylist
+            FileInputStream fis = new FileInputStream(System.getenv("APPDATA") + "\\PrimeCalculator\\memoize.primes");
+            ObjectInputStream ois = new ObjectInputStream(fis);
             results = (ArrayList<Result>) ois.readObject();
-        } 
+            ois.close();
+        }
+        catch (FileNotFoundException e) 
+        {
+            //If file not found, try to create it.
+            try 
+            {
+                File myObj = new File(System.getenv("APPDATA") + "\\PrimeCalculator\\memoize.primes");
+                new File(System.getenv("APPDATA") + "\\PrimeCalculator").mkdirs();
+                myObj.createNewFile();
+                e.printStackTrace();
+            } 
+            catch (IOException e2) 
+            {
+                e.printStackTrace();
+            }
+        }
+        catch (EOFException e) 
+        {
+            //If file is empty, return an empty arraylist
+            return new ArrayList<Result>();
+        }
         catch (IOException | ClassNotFoundException e) 
         {
             e.printStackTrace();
         }
+        //Return the arraylist of saved numbers
         return results;
     }
+    //Save our newest result to a file
     public static void memoize(long input, long factor1, boolean prime)
     {
         try 
         {
+            //Add our newest result to the arraylist
             rememberedResults.add(new Result(input,factor1,prime));
+            //Clear the file by deleting the file, and then creating empty file
             File myObj = new File(System.getenv("APPDATA") + "\\PrimeCalculator\\memoize.primes");
             new File(System.getenv("APPDATA") + "\\PrimeCalculator").mkdirs();
             myObj.delete();
             myObj.createNewFile();
             myObj.setWritable(true);
+            //Write the arraylist to the new, empty file
             FileOutputStream fos = new FileOutputStream(myObj);
             ObjectOutputStream oos = new ObjectOutputStream(fos);
             oos.writeObject(rememberedResults);
@@ -140,8 +165,10 @@ public class App {
             e.printStackTrace();
         }
     }
+    //Check if number has already been calculated
     public static Result isRemembered(long number)
     {
+        //Check every result we have saved
         for (Result result : rememberedResults)
         {
             if (result.number == number)
@@ -166,12 +193,30 @@ public class App {
                 //If exit, end program
                 return false;
             }
+            else if (input.equals("clr"))
+            {
+                //Command to clear the memory of saved numbers
+                try 
+                {
+                    File myObj = new File(System.getenv("APPDATA") + "\\PrimeCalculator\\memoize.primes");
+                    myObj.delete();
+                    myObj.createNewFile();
+                } catch (IOException e2) 
+                {
+                    System.out.println("An error occurred while trying to create a file.");
+                    e2.printStackTrace();
+                }
+                numberOfThreadsCompleted = Integer.MAX_VALUE;
+                return true;
+            }
             System.out.println("Error: Input is not a number, or is too long for this program. Please try again.");
             //Tell main() to restart program
             numberOfThreadsCompleted = Integer.MAX_VALUE;
             return true;
         }
+        //Check if number has already been calculated
         Result rememberedResult = isRemembered(inputNumber);
+        //If number has already been calculated, display the result and restart the program
         if (rememberedResult != null)
         {
             if (rememberedResult.isPrime) {
@@ -190,12 +235,25 @@ public class App {
         }
         //if number is big, warn the user of how long it will take.
         if (input.length() >= 10)
-        System.out.println("Warning: Number is very long and will take some time to compute.");
+        System.out.println("Warning: Number is very long and may take some time to compute.");
         //Prepare all threads
         numberOfThreadsCompleted = 0;
         threadNum = 0;
-        //Assume is prime unless found otherwise
-        isPrime = true;
+        //Check first 100 numbers for prime (faster than starting the threads)
+        isPrime = checkFirst100(inputNumber);
+        //If not prime in the first 100 possible numbers, display the factors and restart the program
+        if (!isPrime) 
+        {
+            //If there is a saved factor, display them. Else show that there was an error.
+            if (factor != 0)
+            {
+                String factorString = "Two factors are " + (inputNumber / factor) + " and " + factor;
+                System.out.println(inputNumber + " is NOT prime. " + factorString);
+            }
+            else System.out.println(inputNumber + " is NOT prime. A program error occurred and it cannot find any factors.");
+            numberOfThreadsCompleted = Integer.MAX_VALUE;
+            return true;
+        }
         //Split number for each thread to calc
         splitNumber();
         //Start all threads to startup with the function startThread()
@@ -208,7 +266,19 @@ public class App {
         //Tell program to continue running
         return true;
     }
-
+    //Check first 100 numbers for prime, to skip starting all the threads for 100 numbers.
+    static boolean checkFirst100(long inputNumber)
+    {
+        for (int i = 2; i < 100; i++)
+        {
+            if (inputNumber % i == 0)
+            {
+                factor = i;
+                return false;
+            }
+        }
+        return true;
+    }
     static void startThread() {
         //Get index of thread, before another thread steals it
         int myThreadNum = threadNum;
@@ -253,6 +323,9 @@ public class App {
             //If the input number / our current test is perfectly divisable, remember the factor, and report number is not prime. End all calculations, no point to continuing.
             if (testNum % i == 0) {
                 factor = i;
+                for (int j = 0; j < numOfThreads; j++) {
+                    threads[j].interrupt();
+                }
                 return false;
             }
         }
