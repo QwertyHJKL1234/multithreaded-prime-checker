@@ -6,8 +6,11 @@ public class Result implements Serializable {
     public boolean isPrime;
     public Result(long number, long factor1, boolean isPrime) {
         this.number = number;
-        this.factor1 = factor1;
-        this.factor2 = number / factor1;
+        if (!isPrime)
+        {
+            this.factor1 = factor1;
+            this.factor2 = number / factor1;
+        }
         this.isPrime = isPrime;
     }
 }
