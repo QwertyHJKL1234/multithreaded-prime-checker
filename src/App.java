@@ -1,5 +1,5 @@
 import java.io.*;
-import java.util.ArrayList;
+import java.util.*;
 //Doesn't check if the file of saved results is actually an ArrayList, could be a security issue.
 @SuppressWarnings("unchecked")
 
@@ -17,6 +17,7 @@ public class App {
     static int testNumber;
     static long startingTime;
     static ArrayList<Result> rememberedResults = new ArrayList<Result>();
+    static int insertionPoint;
 
     public static void main(String[] args) throws Exception {
         numOfThreads = 1;
@@ -33,7 +34,6 @@ public class App {
                 throw new ArrayIndexOutOfBoundsException();
             }
         } catch (NumberFormatException e) {
-
             //If first arg is not a number, exit running
             System.out.println("Error: Desired number of threads is not a number.");
             return;
@@ -140,13 +140,52 @@ public class App {
         //Return the arraylist of saved numbers
         return results;
     }
+    public static int binarySearchResultList(ArrayList<Result> al, long number)
+    {
+        int low = 0;
+        int high = al.size() - 1;
+        while (low <= high) {
+            int mid = (low + high) / 2;
+            if (al.get(mid).number < number) {
+                low = mid + 1;
+            }
+            else if (al.get(mid).number > number) {
+                high = mid - 1;
+            }
+            else {
+                return mid;
+            }
+        }
+        //Return the insertion point of the number if not found
+        return -(low + 1);
+    }
+    // public static ArrayList<Result> sort(ArrayList<Result> in)
+    // {
+    //     for (int i = 0; i < in.size(); i++)
+    //     {
+    //         for (int j = i + 1; j < in.size(); j++)
+    //         {
+    //             if (in.get(i).number > in.get(j).number)
+    //             {
+    //                 Result temp = in.get(i);
+    //                 in.set(i,in.get(j));
+    //                 in.set(j,temp);
+    //             }
+    //         }
+    //     }
+    //     return in;
+    // }
     //Save our newest result to a file
     public static void memoize(long input, long factor1, boolean prime)
     {
         try 
         {
+            if (insertionPoint < 0)
+            {
+                return;
+            }
             //Add our newest result to the arraylist
-            rememberedResults.add(new Result(input,factor1,prime));
+            rememberedResults.add(insertionPoint, new Result(input,factor1,prime));
             //Clear the file by deleting the file, and then creating empty file
             File myObj = new File(System.getenv("APPDATA") + "\\PrimeCalculator\\memoize.primes");
             new File(System.getenv("APPDATA") + "\\PrimeCalculator").mkdirs();
@@ -169,13 +208,13 @@ public class App {
     public static Result isRemembered(long number)
     {
         //Check every result we have saved
-        for (Result result : rememberedResults)
+        int found = binarySearchResultList(rememberedResults, number);
+        if (found >= 0) 
         {
-            if (result.number == number)
-            {
-                return result;
-            }
+            insertionPoint = -(found + 1);
+            return rememberedResults.get(found);
         }
+        insertionPoint = -(found + 1);
         return null;
     }
     public static boolean run() {
@@ -189,11 +228,12 @@ public class App {
         try {
             inputNumber = Long.parseLong(input);
         } catch (NumberFormatException e) {
-            if (input.equals("exit")) {
+            if (input.toLowerCase().equals("exit")) {
                 //If exit, end program
+                System.out.println("Exiting...");
                 return false;
             }
-            else if (input.equals("clr"))
+            else if (input.toLowerCase().equals("clr") || input.toLowerCase().equals("clear"))
             {
                 //Command to clear the memory of saved numbers
                 try 
@@ -207,6 +247,7 @@ public class App {
                     e2.printStackTrace();
                 }
                 numberOfThreadsCompleted = Integer.MAX_VALUE;
+                System.out.println("Memory cleared.");
                 return true;
             }
             System.out.println("Error: Input is not a number, or is too long for this program. Please try again.");
@@ -252,6 +293,7 @@ public class App {
             }
             else System.out.println(inputNumber + " is NOT prime. A program error occurred and it cannot find any factors.");
             numberOfThreadsCompleted = Integer.MAX_VALUE;
+            memoize(inputNumber, factor, isPrime);
             return true;
         }
         //Split number for each thread to calc
